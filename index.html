@@ -155,7 +155,10 @@
   .sug-rich .sug-h{ font-weight:700; margin:13px 0 5px; color:var(--accent2); }
   .sug-rich .sug-p{ margin:8px 0; color:var(--muted); }
   .sug-rich .sug-list{ margin:2px 0 4px; }
-  .sug-rich .sug-item{ margin:5px 0; }
+  .sug-rich .sug-item{ display:flex; align-items:flex-start; gap:9px; margin:7px 0; }
+  .sug-rich .sug-item span{ flex:1; padding-top:3px; }
+  .sug-play{ flex-shrink:0; width:30px; height:30px; border-radius:50%; border:1px solid var(--border2); background:var(--surface2); color:var(--text); font-size:.72rem; cursor:pointer; line-height:1; display:grid; place-items:center; }
+  .sug-play[data-playing="1"]{ background:var(--accent2); color:#06231d; border-color:transparent; }
   .sug-rich strong{ color:var(--text); }
   .empty{ text-align:center; padding:46px 20px 30px; }
   .empty-ico{ font-size:3.2rem; margin-bottom:12px; }
@@ -883,6 +886,8 @@ function suggestNextFlow(){
     }, 320);
   });
   ov.addEventListener("click", function(e){
+    var pv = e.target.closest("[data-preview-q]");
+    if(pv){ playSuggestion(pv.getAttribute("data-preview-q"), pv); return; }
     var en = e.target.closest("[data-energie]");
     if(en){
       sugEnergie = en.getAttribute("data-energie");
@@ -930,27 +935,55 @@ function showSuggestionsFor(chosen){
 }
 // Mini-formateur : transforme le texte de Gemini (gras + puces) en HTML lisible.
 function mdToHtml(t){
-  var lines = esc(t).split(/\r?\n/);
+  var lines = String(t||"").split(/\r?\n/);
   var html = "", inList = false;
   function closeList(){ if(inList){ html += "</div>"; inList = false; } }
-  lines.forEach(function(l){
-    l = l.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/^#+\s*/, "");
-    var trimmed = l.trim();
+  lines.forEach(function(raw){
+    var line = raw.replace(/^#+\s*/, "");
+    var trimmed = line.trim();
     if(!trimmed){ closeList(); return; }
     if(/^[-*•]\s+/.test(trimmed)){
       if(!inList){ html += '<div class="sug-list">'; inList = true; }
-      html += '<div class="sug-item">• '+ trimmed.replace(/^[-*•]\s+/, "") +'</div>';
+      var content = trimmed.replace(/^[-*•]\s+/, "");
+      // requête d'écoute = titre + artiste, nettoyés
+      var q = content.replace(/\([^)]*\)/g, " ")
+                     .replace(/\*\*/g, "")
+                     .replace(/[«»"'\u201C\u201D\u2018\u2019]/g, " ")
+                     .replace(/[–—-]/g, " ")
+                     .replace(/\s+/g, " ").trim();
+      var disp = esc(content).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      html += '<div class="sug-item"><button class="sug-play" data-preview-q="'+esc(q)+'">▶</button><span>'+disp+'</span></div>';
     } else {
       closeList();
-      if(/:$/.test(trimmed) || /^\s*<strong>/.test(l) || /^\d+[.)]/.test(trimmed)){
-        html += '<div class="sug-h">'+ trimmed +'</div>';
+      var l2 = esc(line).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      if(/:$/.test(trimmed) || /^\*\*/.test(trimmed) || /^\d+[.)]/.test(trimmed)){
+        html += '<div class="sug-h">'+ l2.trim() +'</div>';
       } else {
-        html += '<p class="sug-p">'+ trimmed +'</p>';
+        html += '<p class="sug-p">'+ l2.trim() +'</p>';
       }
     }
   });
   closeList();
   return html;
+}
+// Pré-écoute d'un titre suggéré : cherche sur Deezer et joue l'extrait.
+function playSuggestion(q, btn){
+  if(!q) return;
+  if(btn.getAttribute("data-playing") === "1"){
+    try{ player.pause(); }catch(e){}
+    btn.textContent = "▶"; btn.removeAttribute("data-playing"); return;
+  }
+  var others = document.querySelectorAll(".sug-play[data-playing='1']");
+  for(var j=0;j<others.length;j++){ others[j].textContent = "▶"; others[j].removeAttribute("data-playing"); }
+  btn.textContent = "⏳";
+  deezerSmartSearch(q).then(function(res){
+    var t = null;
+    for(var i=0;i<res.length;i++){ if(res[i] && res[i].preview){ t = res[i]; break; } }
+    if(!t || !t.preview){ btn.textContent = "✕"; setTimeout(function(){ btn.textContent = "▶"; }, 1200); return; }
+    try{ player.src = t.preview; player.play().catch(function(){}); }catch(e){}
+    btn.textContent = "⏸"; btn.setAttribute("data-playing", "1");
+    player.onended = function(){ btn.textContent = "▶"; btn.removeAttribute("data-playing"); };
+  });
 }
 // Appelle Gemini via la fonction Netlify. Renvoie le texte, ou "" si indisponible.
 async function aiText(chosen){
