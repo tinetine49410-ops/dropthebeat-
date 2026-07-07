@@ -16,21 +16,21 @@ export default async (req) => {
   if (!track) return json({ suggestions: [] });
 
   const cap = {
-    monter: "fais clairement MONTER l'énergie de la piste, vers des morceaux plus dansants et fédérateurs",
-    garder: "GARDE le même niveau d'énergie, dans une continuité cohérente d'ambiance et de tempo",
-    calmer: "fais légèrement REDESCENDRE l'énergie, vers des morceaux plus posés mais toujours agréables"
-  }[energie] || "fais monter l'énergie de la piste";
+    monter: "fais MONTER l'énergie : titres au tempo égal ou légèrement supérieur, plus dansants et fédérateurs",
+    garder: "GARDE le même niveau d'énergie et un tempo (BPM) très proche, pour une transition fluide",
+    calmer: "fais légèrement REDESCENDRE l'énergie, tempo un peu plus lent, mais toujours agréable et connu"
+  }[energie] || "fais monter l'énergie";
 
   const prompt =
-    `Tu es un DJ professionnel qui anime des ${ambiance} devant un large public.\n` +
-    `Je viens de passer le titre "${track}"${artist ? " de " + artist : ""}.\n` +
-    `Propose exactement 6 titres à enchaîner juste après. Objectif d'énergie : ${cap}.\n` +
-    `RÈGLES ABSOLUES :\n` +
-    `- Uniquement des TUBES connus et fédérateurs, que le grand public reconnaît immédiatement et qui font danser une salle (mariage, soirée). PAS de morceaux obscurs, underground, confidentiels ou de niche.\n` +
-    `- Reste dans le même esprit festif et le même univers musical que le titre de départ (langue, style, énergie), mais privilégie TOUJOURS la notoriété du morceau : si tu hésites entre un titre pointu et un tube connu, choisis le tube connu.\n` +
-    `- Le nom de l'ARTISTE ORIGINAL exact (jamais de reprises, remixes obscurs, versions karaoké ou covers).\n` +
-    `- Un artiste différent à chaque fois. Ne propose pas le morceau que je viens de passer.\n` +
-    `Pense aux titres incontournables qui marchent à tous les coups dans ce style.\n` +
+    `Tu es un DJ professionnel expérimenté qui anime des ${ambiance}.\n` +
+    `Je viens de passer "${track}"${artist ? " de " + artist : ""}.\n\n` +
+    `Étape 1 — analyse (en interne, ne l'écris pas) : identifie le style/genre précis, l'époque, le tempo approximatif (BPM), la langue et le pays musical de ce morceau.\n` +
+    `Étape 2 — propose 6 titres à enchaîner juste après. Objectif : ${cap}.\n\n` +
+    `RÈGLES (dans cet ordre de priorité) :\n` +
+    `1. COHÉRENCE avant tout : reste dans la MÊME famille musicale et la même vibe que le morceau de départ (ex : si c'est du latino/reggaeton, propose du latino/reggaeton ; si c'est du festif français, propose du festif français). Ne pars pas vers un "tube de soirée" générique qui n'a rien à voir.\n` +
+    `2. TEMPO compatible : privilégie des morceaux dont le BPM permet un enchaînement fluide (proche du tempo de départ).\n` +
+    `3. NOTORIÉTÉ : uniquement des titres connus et fédérateurs que le grand public reconnaît et qui remplissent une piste. Pas de morceaux obscurs ni underground.\n` +
+    `4. Nom de l'ARTISTE ORIGINAL exact (jamais de reprises, remixes obscurs, karaoké ou covers). Un artiste différent par titre. Ne repropose pas le morceau de départ.\n\n` +
     `Réponds UNIQUEMENT avec un tableau JSON valide, sans aucun texte autour, ` +
     `au format: [{"title":"Titre","artist":"Artiste original"}]`;
 
@@ -48,7 +48,7 @@ export default async (req) => {
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 800,
-        temperature: 0.7,
+        temperature: 0.6,
         messages: [{ role: "user", content: prompt }]
       })
     });
