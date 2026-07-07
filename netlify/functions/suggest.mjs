@@ -1,4 +1,4 @@
-=// Fonction Netlify — suggestions d'enchaînement DJ via ChatGPT (OpenAI, AI Gateway Netlify), texte riche.
+// Fonction Netlify — suggestions d'enchaînement DJ via ChatGPT (OpenAI, AI Gateway Netlify), texte riche.
 // Tente d'abord la recherche web (gpt-4o-search-preview), puis retombe sur gpt-4o si indisponible.
 export default async (req) => {
   const json = (obj, status = 200) =>
