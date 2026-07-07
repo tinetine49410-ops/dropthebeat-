@@ -30,18 +30,20 @@ export default async (req) => {
     `- Une dernière ligne « Conseil calage : ... » indiquant le/les titres les plus faciles à mixer côté tempo.\n` +
     `Uniquement des titres réels et grand public (pas d'obscurités, ni reprises/remixes). Reste bref et lisible sur mobile. N'utilise pas de tableau, juste des listes à puces avec le tiret "-".`;
 
-  const base = process.env.GOOGLE_GEMINI_BASE_URL || "https://generativelanguage.googleapis.com";
+  const base = (process.env.GOOGLE_GEMINI_BASE_URL || "https://generativelanguage.googleapis.com").replace(/\/$/, "");
   const key = process.env.GEMINI_API_KEY || "";
-  const model = "gemini-2.5-flash";
+  const model = "gemini-3.5-flash";
 
   try {
-    const url = base.replace(/\/$/, "") + "/v1beta/models/" + model + ":generateContent?key=" + encodeURIComponent(key);
-    const r = await fetch(url, {
+    const r = await fetch(base + "/v1beta/models/" + model + ":generateContent", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": key
+      },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 900 }
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 1500 }
       })
     });
 
