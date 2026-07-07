@@ -904,7 +904,7 @@ function showSuggestionsFor(chosen){
   sugChosen = chosen;
   var box = document.getElementById("sugList"), search = document.getElementById("sugSearch");
   if(search) search.value = chosen.title;
-  box.innerHTML = '<p class="hint">🎚️ Gemini prépare ton enchaînement…</p>';
+  box.innerHTML = '<p class="hint">🎚️ L\'IA prépare ton enchaînement…</p>';
   aiText(chosen).then(function(txt){
     var box2 = document.getElementById("sugList");
     if(!box2) return;
