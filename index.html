@@ -841,15 +841,21 @@ async function getSuggestions(r){
   });
   return res.slice(0, 12);
 }
-var sugPick = [], sugResults = [];
+var sugPick = [], sugResults = [], sugEnergie = "monter", sugChosen = null;
 function suggestNextFlow(){
+  sugChosen = null; sugEnergie = "monter";
   var ov = document.createElement("div"); ov.className = "overlay";
   ov.onclick = function(e){ if(e.target === ov) ov.remove(); };
   ov.innerHTML =
     '<div class="modal" style="max-width:440px"><h3>🎚️ Et après ?</h3>'+
     '<p class="hint" style="margin:-6px 0 10px">Quel titre viens-tu de passer&nbsp;?</p>'+
     '<input id="sugSearch" placeholder="Titre ou artiste…" autocomplete="off">'+
-    '<div id="sugList" style="margin-top:10px; text-align:left"></div>'+
+    '<div class="tabs" id="sugEnergie" style="margin-top:12px">'+
+      '<span class="pill on" data-energie="monter">🔥 Faire monter</span>'+
+      '<span class="pill" data-energie="garder">➡️ Garder</span>'+
+      '<span class="pill" data-energie="calmer">🌙 Calmer</span>'+
+    '</div>'+
+    '<div id="sugList" style="margin-top:12px; text-align:left"></div>'+
     '<button class="btn ghost" style="margin-top:12px" onclick="this.closest(\'.overlay\').remove()">Fermer</button></div>';
   document.body.appendChild(ov);
   var inp = document.getElementById("sugSearch"), t = null;
@@ -871,8 +877,16 @@ function suggestNextFlow(){
     }, 320);
   });
   ov.addEventListener("click", function(e){
+    var en = e.target.closest("[data-energie]");
+    if(en){
+      sugEnergie = en.getAttribute("data-energie");
+      var pills = ov.querySelectorAll("[data-energie]");
+      for(var i=0;i<pills.length;i++) pills[i].classList.toggle("on", pills[i]===en);
+      if(sugChosen) showSuggestionsFor(sugChosen);
+      return;
+    }
     var pk = e.target.closest("[data-sugpick]");
-    if(pk){ var c = sugPick[+pk.getAttribute("data-sugpick")]; if(c) showSuggestionsFor(c); return; }
+    if(pk){ var c = sugPick[+pk.getAttribute("data-sugpick")]; if(c){ sugChosen = c; showSuggestionsFor(c); } return; }
     var pl = e.target.closest("[data-sug-play]");
     if(pl){ var tt = sugResults[+pl.getAttribute("data-sug-play")]; if(tt && tt.preview) togglePreview(tt.preview, "sug"); return; }
     var ad = e.target.closest("[data-sug-add]");
@@ -881,16 +895,17 @@ function suggestNextFlow(){
   setTimeout(function(){ inp.focus(); }, 60);
 }
 function showSuggestionsFor(chosen){
+  sugChosen = chosen;
   var box = document.getElementById("sugList"), search = document.getElementById("sugSearch");
   if(search) search.value = chosen.title;
-  box.innerHTML = '<p class="hint">🎚️ L\'IA cherche le meilleur enchaînement…</p>';
+  box.innerHTML = '<p class="hint">🎚️ L\'IA prépare ton enchaînement…</p>';
   aiSuggest(chosen).then(function(list){
     var box2 = document.getElementById("sugList");
     if(!box2) return;
     if(!list.length){ box2.innerHTML = '<p class="hint">Pas d\'idée trouvée pour ce titre 🤔</p>'; return; }
     sugResults = list;
     box2.innerHTML =
-      '<p class="hint" style="text-align:left;margin:4px 2px 10px">Pour enchaîner après « '+esc(chosen.title)+' » :</p>'+
+      '<p class="hint" style="text-align:left;margin:4px 2px 10px">Après « '+esc(chosen.title)+' » :</p>'+
       list.map(function(x,i){
         return '<div class="track"><img class="cover" src="'+esc(x.cover)+'"><div class="tk-info"><div class="tk-title">'+esc(x.title)+'</div><div class="tk-artist">'+esc(x.artist)+'</div></div>'+
           (x.preview ? '<button class="play" data-sug-play="'+i+'">▶</button>' : '')+
@@ -898,13 +913,24 @@ function showSuggestionsFor(chosen){
       }).join("");
   });
 }
+// Choisit le résultat Deezer dont l'artiste colle le mieux (évite les remix/reprises douteux).
+function bestMatch(results, wantArtist){
+  if(!results || !results.length) return null;
+  var wa = (wantArtist||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+  if(!wa) return results[0];
+  for(var i=0;i<results.length;i++){
+    var a = (results[i].artist && results[i].artist.name || "").toLowerCase().replace(/[^a-z0-9]/g,"");
+    if(a && (a.indexOf(wa) >= 0 || wa.indexOf(a) >= 0)) return results[i];
+  }
+  return results[0];
+}
 // IA d'abord (via la fonction Netlify), repli sur les suggestions Deezer si indisponible.
 async function aiSuggest(chosen){
   try{
     var r = await fetch("/api/suggest", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ track: chosen.title, artist: chosen.artist, ambiance: CONFIG.ambiance || "soirée dansante" })
+      body: JSON.stringify({ track: chosen.title, artist: chosen.artist, ambiance: CONFIG.ambiance || "soirée dansante", energie: sugEnergie })
     });
     if(r.ok){
       var data = await r.json();
@@ -912,7 +938,8 @@ async function aiSuggest(chosen){
         var proms = data.suggestions.slice(0,8).map(function(s){
           var q = ((s.title||"") + " " + (s.artist||"")).trim();
           return deezerSearch(q).then(function(dz){
-            return (dz && dz.length) ? slim(dz[0]) : { title:s.title||"", artist:s.artist||"", cover:"", link:"", preview:"" };
+            var best = bestMatch(dz, s.artist);
+            return best ? slim(best) : { title:s.title||"", artist:s.artist||"", cover:"", link:"", preview:"" };
           });
         });
         var enriched = await Promise.all(proms);
