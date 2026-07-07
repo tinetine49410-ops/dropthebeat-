@@ -22,16 +22,15 @@ export default async (req) => {
   }[energie] || "fais monter l'énergie de la piste";
 
   const prompt =
-    `Tu es un DJ professionnel très expérimenté qui anime des ${ambiance}. ` +
-    `Tu connais aussi bien les gros tubes que les pépites moins évidentes, toutes époques confondues.\n` +
+    `Tu es un DJ professionnel qui anime des ${ambiance} devant un large public.\n` +
     `Je viens de passer le titre "${track}"${artist ? " de " + artist : ""}.\n` +
-    `Analyse son style, son époque, son tempo et son ambiance, puis propose exactement 6 titres à enchaîner juste après. ` +
-    `Objectif d'énergie : ${cap}.\n` +
-    `Règles impératives :\n` +
-    `- Reste musicalement cohérent avec la piste (pas de saut de genre brutal et illogique).\n` +
-    `- Mélange 2 valeurs sûres qui font danser et 4 choix plus fins/originaux : évite les clichés archi-rebattus et les enchaînements trop évidents.\n` +
-    `- Choisis des morceaux réellement existants et connus, avec le nom de l'ARTISTE ORIGINAL exact (jamais de reprises, remixes obscurs ou versions karaoké).\n` +
+    `Propose exactement 6 titres à enchaîner juste après. Objectif d'énergie : ${cap}.\n` +
+    `RÈGLES ABSOLUES :\n` +
+    `- Uniquement des TUBES connus et fédérateurs, que le grand public reconnaît immédiatement et qui font danser une salle (mariage, soirée). PAS de morceaux obscurs, underground, confidentiels ou de niche.\n` +
+    `- Reste dans le même esprit festif et le même univers musical que le titre de départ (langue, style, énergie), mais privilégie TOUJOURS la notoriété du morceau : si tu hésites entre un titre pointu et un tube connu, choisis le tube connu.\n` +
+    `- Le nom de l'ARTISTE ORIGINAL exact (jamais de reprises, remixes obscurs, versions karaoké ou covers).\n` +
     `- Un artiste différent à chaque fois. Ne propose pas le morceau que je viens de passer.\n` +
+    `Pense aux titres incontournables qui marchent à tous les coups dans ce style.\n` +
     `Réponds UNIQUEMENT avec un tableau JSON valide, sans aucun texte autour, ` +
     `au format: [{"title":"Titre","artist":"Artiste original"}]`;
 
@@ -49,7 +48,7 @@ export default async (req) => {
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 800,
-        temperature: 1,
+        temperature: 0.7,
         messages: [{ role: "user", content: prompt }]
       })
     });
