@@ -142,6 +142,18 @@
   .djcount{ color:var(--muted); font-size:.82rem; }
   .dj-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
   .dj-grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:18px; }
+  .dj-grid4{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:18px; }
+  .stat-h{ font-family:"Unbounded",sans-serif; font-weight:600; font-size:.95rem; color:var(--accent2); margin:14px 0 8px; }
+  .stat-row{ display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:.92rem; }
+  .stat-row b{ font-size:1.05rem; }
+  .stat-sub{ font-weight:700; font-size:.82rem; color:var(--muted); margin:12px 0 4px; text-transform:uppercase; letter-spacing:.5px; }
+  .stat-line{ display:flex; justify-content:space-between; gap:10px; font-size:.88rem; padding:3px 0; }
+  .stat-line span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .stat-line b{ flex-shrink:0; color:var(--accent2); }
+  .hist-item{ background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:11px 13px; margin-bottom:8px; }
+  .hist-t{ font-weight:600; font-size:.9rem; }
+  .hist-s{ font-size:.82rem; color:var(--muted); margin-top:2px; }
+  .hist-top{ font-size:.82rem; color:var(--accent2); margin-top:4px; }
   .tgl{ border:1px solid var(--border); border-radius:14px; padding:15px 8px; font-family:inherit; font-weight:700; font-size:.94rem; cursor:pointer; background:var(--surface2); color:var(--text); transition:transform .08s; }
   .tgl:active{ transform:scale(.97); }
   .tgl.on{ background:linear-gradient(120deg,var(--accent2),#4ff0d5); color:#06231d; border-color:transparent; }
@@ -616,9 +628,10 @@ function renderDJ(){
       '<button class="tgl '+(alertsOn?"on":"")+'" data-act="alerts">'+(alertsOn?"🔔 Alertes ON":"🔕 Alertes OFF")+'</button>'+
       '<button class="tgl '+(djOpen?"on":"red")+'" data-act="toggleopen">'+(djOpen?"🟢 Ouvertes":"🔴 Fermées")+'</button>'+
     '</div>'+
-    '<div class="dj-grid3">'+
+    '<div class="dj-grid4">'+
       '<button class="sec" data-act="qr">📷<span>QR</span></button>'+
       '<button class="sec" data-act="rename">✏️<span>Nom</span></button>'+
+      '<button class="sec" data-act="stats">📊<span>Stats</span></button>'+
       '<button class="sec" data-act="clear">🗑️<span>Vider</span></button>'+
     '</div>'+
     '<button class="btn next-btn" data-act="next">🎚️ Et après&nbsp;? — trouver un enchaînement</button>'+
@@ -759,6 +772,9 @@ function saveSoiree(){
 function clearAll(){
   if(!requests.length){ return; }
   if(!confirm("Supprimer TOUTES les demandes ? C'est définitif.")) return;
+  clearAllSilent();
+}
+function clearAllSilent(){
   var ids = requests.map(function(r){ return r.id; }), i = 0;
   (function next(){
     if(i >= ids.length) return;
@@ -767,6 +783,85 @@ function clearAll(){
     i += 400;
     batch.commit().then(next).catch(function(e){ console.error(e); });
   })();
+}
+
+/* ─────────── STATISTIQUES & HISTORIQUE ─────────── */
+function HISTORY(){ return db.collection("settings").doc("history"); }
+function computeStats(list){
+  var titres = {}, artistes = {};
+  var joues = 0;
+  list.forEach(function(r){
+    if(r.status === "done") joues++;
+    var t = (r.title||"").trim();
+    if(t){ var k = t + " — " + (r.artist||""); titres[k] = (titres[k]||0) + 1; }
+    var a = (r.artist||"").trim();
+    if(a){ artistes[a] = (artistes[a]||0) + 1; }
+  });
+  function top(obj){
+    return Object.keys(obj).map(function(k){ return { name:k, n:obj[k] }; })
+      .sort(function(x,y){ return y.n - x.n; }).slice(0, 5);
+  }
+  return { total:list.length, joues:joues, recus:list.length, topTitres:top(titres), topArtistes:top(artistes) };
+}
+function statsBlock(st){
+  var h = '<div class="stat-row"><span>Total demandes</span><b>'+st.total+'</b></div>'+
+          '<div class="stat-row"><span>Jouées / reçues</span><b>'+st.joues+' / '+st.recus+'</b></div>';
+  if(st.topTitres.length){
+    h += '<div class="stat-sub">Top titres</div>';
+    st.topTitres.forEach(function(t){ h += '<div class="stat-line"><span>'+esc(t.name)+'</span><b>×'+t.n+'</b></div>'; });
+  }
+  if(st.topArtistes.length){
+    h += '<div class="stat-sub">Top artistes</div>';
+    st.topArtistes.forEach(function(t){ h += '<div class="stat-line"><span>'+esc(t.name)+'</span><b>×'+t.n+'</b></div>'; });
+  }
+  return h;
+}
+function showStats(){
+  var st = computeStats(requests);
+  var ov = document.createElement("div"); ov.className = "overlay";
+  ov.onclick = function(e){ if(e.target === ov) ov.remove(); };
+  ov.innerHTML =
+    '<div class="modal" style="max-width:430px;text-align:left">'+
+      '<h3 style="text-align:center">📊 Statistiques</h3>'+
+      '<div class="stat-h">Cette soirée — '+esc(soireeNom)+'</div>'+
+      statsBlock(st)+
+      '<button class="btn" style="margin:14px 0 4px" data-act="archive">🏁 Clôturer &amp; archiver la soirée</button>'+
+      '<div class="stat-h">Historique des soirées</div>'+
+      '<div id="histBox"><p class="hint">Chargement…</p></div>'+
+      '<button class="btn ghost" style="margin-top:12px" onclick="this.closest(\'.overlay\').remove()">Fermer</button>'+
+    '</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener("click", function(e){
+    if(e.target.closest("[data-act='archive']")) archiveSoiree();
+  });
+  HISTORY().get().then(function(doc){
+    var box = document.getElementById("histBox"); if(!box) return;
+    var events = (doc.exists && Array.isArray(doc.data().events)) ? doc.data().events : [];
+    if(!events.length){ box.innerHTML = '<p class="hint">Aucune soirée archivée pour l\'instant.</p>'; return; }
+    box.innerHTML = events.map(function(ev){
+      var ds = "";
+      try{ ds = new Date(ev.date).toLocaleDateString("fr-FR"); }catch(e){}
+      var topT = (ev.topTitres && ev.topTitres[0]) ? '<div class="hist-top">🎵 '+esc(ev.topTitres[0].name)+' (×'+ev.topTitres[0].n+')</div>' : '';
+      return '<div class="hist-item"><div class="hist-t">'+esc(ev.nom||"Soirée")+' · '+ds+'</div>'+
+             '<div class="hist-s">'+ev.total+' demandes · '+ev.joues+' jouées</div>'+ topT +'</div>';
+    }).join("");
+  }).catch(function(e){ console.error(e); });
+}
+function archiveSoiree(){
+  if(!requests.length){ alert("Aucune demande à archiver pour cette soirée."); return; }
+  if(!confirm("Clôturer « "+soireeNom+" » ?\nLes demandes seront enregistrées dans l'historique puis effacées de la file.")) return;
+  var st = computeStats(requests);
+  var entry = { nom: soireeNom, date: Date.now(), total: st.total, joues: st.joues, recus: st.recus, topTitres: st.topTitres, topArtistes: st.topArtistes };
+  HISTORY().get().then(function(doc){
+    var events = (doc.exists && Array.isArray(doc.data().events)) ? doc.data().events : [];
+    events.unshift(entry);
+    if(events.length > 100) events = events.slice(0, 100);
+    return HISTORY().set({ events: events });
+  }).then(function(){
+    clearAllSilent();
+    var ov = document.querySelector(".overlay"); if(ov) ov.remove();
+    alert("Soirée archivée ✓ — file remise à zéro.");
+  }).catch(function(e){ console.error(e); alert("Erreur lors de l'archivage."); });
 }
 
 /* ─────────── QR CODE ─────────── */
@@ -1068,6 +1163,7 @@ app.addEventListener("click", function(e){
   else if(a==="filter"){ setFilter(el.getAttribute("data-val")); }
   else if(a==="toggleopen"){ toggleOpen(); }
   else if(a==="clear"){ clearAll(); }
+  else if(a==="stats"){ showStats(); }
   else if(a==="contact"){ showContact(); }
   else if(a==="rename"){ renameSoiree(); }
   else if(a==="reply"){ replyTo(el.getAttribute("data-id")); }
