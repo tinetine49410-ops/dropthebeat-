@@ -16,21 +16,28 @@ export default async (req) => {
   if (!track) return json({ text: "" });
 
   const cap = {
-    monter: "fais MONTER l'énergie de la piste",
-    garder: "GARDE le même niveau d'énergie",
-    calmer: "fais légèrement REDESCENDRE l'énergie"
-  }[energie] || "fais monter l'énergie";
+    monter:
+      "OBJECTIF : FAIRE MONTER LA PISTE. Propose des titres au tempo PLUS ÉLEVÉ que le morceau de départ (BPM supérieur), " +
+      "plus intenses et explosifs, de vraies bombes de dancefloor qui font grimper l'énergie d'un cran. Évite tout ce qui est calme ou mid-tempo.",
+    garder:
+      "OBJECTIF : GARDER LA MÊME ÉNERGIE. Propose des titres au tempo TRÈS PROCHE (BPM quasi identique) et dans la même ambiance, " +
+      "pour un enchaînement fluide et cohérent qui ne casse pas le rythme ni la vibe.",
+    calmer:
+      "OBJECTIF : FAIRE REDESCENDRE EN DOUCEUR. Propose des titres plus LENTS (BPM plus bas), plus posés : mid-tempo, groove tranquille " +
+      "ou slows dansants, pour calmer la piste après un gros moment ou en fin de soirée, tout en restant agréables et connus."
+  }[energie] || "OBJECTIF : faire monter l'énergie de la piste.";
 
   const prompt =
     `Tu es un DJ professionnel expérimenté qui anime des ${ambiance}. ` +
-    `Je viens de passer "${track}"${artist ? " de " + artist : ""} et je cherche quoi enchaîner (objectif : ${cap}). ` +
+    `Je viens de passer "${track}"${artist ? " de " + artist : ""}. ` +
     `Si le morceau est récent ou peu connu, vérifie sur le web de quel morceau il s'agit avant de répondre.\n\n` +
+    `${cap}\n\n` +
     `Réponds de façon concise et pratique, en français, EXACTEMENT ainsi :\n` +
-    `- Une courte phrase d'intro qui précise le style, l'époque et le tempo approximatif (BPM) du morceau.\n` +
-    `- 2 ou 3 catégories courtes, chacune sur sa ligne au format "**Nom de catégorie**", suivie de 3 à 4 morceaux en puces "- Titre – Artiste original (remarque très courte facultative)".\n` +
+    `- Une courte phrase d'intro qui précise le style, l'époque et le tempo approximatif (BPM) du morceau de départ, ET vers quel tempo on va (monter / rester / descendre).\n` +
+    `- 2 ou 3 catégories courtes, chacune sur sa ligne au format "**Nom de catégorie**", suivie de 3 à 4 morceaux en puces "- Titre – Artiste original (remarque très courte, ex. BPM ou énergie)".\n` +
     `- Une dernière ligne "**Conseil calage :** ..." indiquant le/les titres les plus faciles à mixer côté tempo.\n` +
     `Uniquement des titres réels et grand public que tout le monde reconnaît (pas d'obscurités, ni reprises/remixes). ` +
-    `Reste dans la même famille musicale que le morceau de départ. Sois bref et lisible sur mobile. Pas de tableau.`;
+    `Respecte STRICTEMENT l'objectif d'énergie ci-dessus. Sois bref et lisible sur mobile. Pas de tableau.`;
 
   const base = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
   const key = process.env.OPENAI_API_KEY || "";
@@ -50,7 +57,6 @@ export default async (req) => {
 
   let text = "";
 
-  // 1) Tentative AVEC recherche web (comportement ChatGPT).
   try {
     text = await callModel({
       model: "gpt-4o-search-preview",
@@ -60,7 +66,6 @@ export default async (req) => {
     });
   } catch (e) { text = ""; }
 
-  // 2) Repli SANS recherche web (fiable) si la première a échoué.
   if (!text) {
     try {
       text = await callModel({
