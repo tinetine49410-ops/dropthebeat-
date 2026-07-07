@@ -360,7 +360,7 @@ function renderPublic(){
     var em, title, sub;
     if(gone){ em="🙈"; title="Demande retirée"; sub="Le DJ a retiré ta demande. Tu peux en envoyer une autre."; }
     else if(st==="playing"){ em="🔥"; title="Ça arrive !"; sub="Prépare-toi, le DJ lance ton titre."; }
-    else if(st==="done"){ em="✅"; title="C'est passé !"; sub="Ton titre a été joué — merci d'avoir participé&nbsp;!"; }
+    else if(st==="done"){ em="🔥"; title="Ta musique est lancée !"; sub="Le DJ vient de passer ton titre 🎶 Merci d'avoir participé&nbsp;!"; }
     else { em="🎶"; title="C'est dans la file !"; sub="Le DJ a reçu ta demande. Garde cette page ouverte pour suivre."; }
     app.innerHTML =
       '<div class="done"><div class="em">'+em+'</div>'+
@@ -654,7 +654,7 @@ function reqCard(r){
     '<div class="req-actions">'+
       (r.link ? '<a class="act" style="text-decoration:none;text-align:center" href="'+esc(r.link)+'" target="_blank">Deezer ↗</a>' : '')+
       '<button class="act" data-act="reply" data-id="'+r.id+'">💬 Répondre</button>'+
-      (r.status!=="playing" ? '<button class="act go" data-act="status" data-id="'+r.id+'" data-val="playing">▶ Lancer</button>' : '<button class="act go" data-act="status" data-id="'+r.id+'" data-val="done">✓ Terminé</button>')+
+      '<button class="act go" data-act="launch" data-id="'+r.id+'">▶ Lancer</button>'+
       '<button class="act bad" data-act="remove" data-id="'+r.id+'">✕</button>'+
     '</div></div>';
 }
@@ -1074,6 +1074,7 @@ app.addEventListener("click", function(e){
   else if(a==="next"){ suggestNextFlow(); }
   else if(a==="preview"){ togglePreview(el.getAttribute("data-url"), el.getAttribute("data-id")); }
   else if(a==="status"){ setStatus(el.getAttribute("data-id"), el.getAttribute("data-val")); }
+  else if(a==="launch"){ setStatus(el.getAttribute("data-id"), "done"); }
   else if(a==="remove"){ removeReq(el.getAttribute("data-id")); }
 });
 
