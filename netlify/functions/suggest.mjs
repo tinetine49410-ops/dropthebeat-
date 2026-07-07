@@ -23,8 +23,8 @@ export default async (req) => {
       "OBJECTIF : GARDER LA MÊME ÉNERGIE. Propose des titres au tempo TRÈS PROCHE (BPM quasi identique) et dans la même ambiance, " +
       "pour un enchaînement fluide et cohérent qui ne casse pas le rythme ni la vibe.",
     calmer:
-      "OBJECTIF : FAIRE REDESCENDRE EN DOUCEUR. Propose des titres plus LENTS (BPM plus bas), plus posés : mid-tempo, groove tranquille " +
-      "ou slows dansants, pour calmer la piste après un gros moment ou en fin de soirée, tout en restant agréables et connus."
+      "OBJECTIF : FAIRE REDESCENDRE L'ENERGIE SANS VIDER LA PISTE. Propose du MID-TEMPO DANSANT (environ 90 a 110 BPM), " +
+      "des grooves entrainants mais plus poses qui gardent les gens sur la piste. PAS de vraies ballades ni de slows trop lents (evite le < 85 BPM)."
   }[energie] || "OBJECTIF : faire monter l'énergie de la piste.";
 
   const prompt =
