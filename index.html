@@ -151,6 +151,12 @@
   .sec span{ font-size:.74rem; font-weight:600; color:var(--muted); }
   .tabs{ display:flex; gap:8px; margin-bottom:16px; }
   .next-btn{ background:linear-gradient(100deg,#7c5cff,#a17bff) !important; color:#fff !important; margin-bottom:16px; }
+  .sug-rich{ text-align:left; font-size:.92rem; line-height:1.5; color:var(--text); }
+  .sug-rich .sug-h{ font-weight:700; margin:13px 0 5px; color:var(--accent2); }
+  .sug-rich .sug-p{ margin:8px 0; color:var(--muted); }
+  .sug-rich .sug-list{ margin:2px 0 4px; }
+  .sug-rich .sug-item{ margin:5px 0; }
+  .sug-rich strong{ color:var(--text); }
   .empty{ text-align:center; padding:46px 20px 30px; }
   .empty-ico{ font-size:3.2rem; margin-bottom:12px; }
   .empty-t{ font-family:"Unbounded",sans-serif; font-weight:600; font-size:1.15rem; margin-bottom:8px; }
@@ -898,64 +904,65 @@ function showSuggestionsFor(chosen){
   sugChosen = chosen;
   var box = document.getElementById("sugList"), search = document.getElementById("sugSearch");
   if(search) search.value = chosen.title;
-  box.innerHTML = '<p class="hint">🎚️ L\'IA prépare ton enchaînement…</p>';
-  aiSuggest(chosen).then(function(list){
+  box.innerHTML = '<p class="hint">🎚️ Gemini prépare ton enchaînement…</p>';
+  aiText(chosen).then(function(txt){
     var box2 = document.getElementById("sugList");
     if(!box2) return;
-    if(!list.length){ box2.innerHTML = '<p class="hint">Pas d\'idée trouvée pour ce titre 🤔</p>'; return; }
-    sugResults = list;
-    box2.innerHTML =
-      '<p class="hint" style="text-align:left;margin:4px 2px 10px">Après « '+esc(chosen.title)+' » :</p>'+
-      list.map(function(x,i){
-        return '<div class="track"><img class="cover" src="'+esc(x.cover)+'"><div class="tk-info"><div class="tk-title">'+esc(x.title)+'</div><div class="tk-artist">'+esc(x.artist)+'</div></div>'+
-          (x.preview ? '<button class="play" data-sug-play="'+i+'">▶</button>' : '')+
-          '<button class="play" data-sug-add="'+i+'" title="Ajouter à la file">➕</button></div>';
-      }).join("");
+    if(txt){
+      box2.innerHTML = '<div class="sug-rich">'+ mdToHtml(txt) +'</div>';
+      return;
+    }
+    // repli : suggestions Deezer en cartes cliquables
+    getSuggestions(chosen).then(function(list){
+      var b3 = document.getElementById("sugList");
+      if(!b3) return;
+      if(!list.length){ b3.innerHTML = '<p class="hint">Pas d\'idée trouvée pour ce titre 🤔</p>'; return; }
+      sugResults = list;
+      b3.innerHTML =
+        '<p class="hint" style="text-align:left;margin:4px 2px 10px">Après « '+esc(chosen.title)+' » :</p>'+
+        list.map(function(x,i){
+          return '<div class="track"><img class="cover" src="'+esc(x.cover)+'"><div class="tk-info"><div class="tk-title">'+esc(x.title)+'</div><div class="tk-artist">'+esc(x.artist)+'</div></div>'+
+            (x.preview ? '<button class="play" data-sug-play="'+i+'">▶</button>' : '')+
+            '<button class="play" data-sug-add="'+i+'" title="Ajouter à la file">➕</button></div>';
+        }).join("");
+    });
   });
 }
-// Choisit le résultat Deezer dont l'artiste colle le mieux (évite les remix/reprises douteux).
-function bestMatch(results, wantArtist){
-  if(!results || !results.length) return null;
-  var wa = (wantArtist||"").toLowerCase().replace(/[^a-z0-9]/g,"");
-  if(!wa) return results[0];
-  for(var i=0;i<results.length;i++){
-    var a = (results[i].artist && results[i].artist.name || "").toLowerCase().replace(/[^a-z0-9]/g,"");
-    if(a && (a.indexOf(wa) >= 0 || wa.indexOf(a) >= 0)) return results[i];
-  }
-  return results[0];
+// Mini-formateur : transforme le texte de Gemini (gras + puces) en HTML lisible.
+function mdToHtml(t){
+  var lines = esc(t).split(/\r?\n/);
+  var html = "", inList = false;
+  function closeList(){ if(inList){ html += "</div>"; inList = false; } }
+  lines.forEach(function(l){
+    l = l.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/^#+\s*/, "");
+    var trimmed = l.trim();
+    if(!trimmed){ closeList(); return; }
+    if(/^[-*•]\s+/.test(trimmed)){
+      if(!inList){ html += '<div class="sug-list">'; inList = true; }
+      html += '<div class="sug-item">• '+ trimmed.replace(/^[-*•]\s+/, "") +'</div>';
+    } else {
+      closeList();
+      if(/:$/.test(trimmed) || /^\s*<strong>/.test(l) || /^\d+[.)]/.test(trimmed)){
+        html += '<div class="sug-h">'+ trimmed +'</div>';
+      } else {
+        html += '<p class="sug-p">'+ trimmed +'</p>';
+      }
+    }
+  });
+  closeList();
+  return html;
 }
-// IA d'abord (via la fonction Netlify), repli sur les suggestions Deezer si indisponible.
-async function aiSuggest(chosen){
+// Appelle Gemini via la fonction Netlify. Renvoie le texte, ou "" si indisponible.
+async function aiText(chosen){
   try{
     var r = await fetch("/api/suggest", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ track: chosen.title, artist: chosen.artist, ambiance: CONFIG.ambiance || "soirée dansante", energie: sugEnergie })
     });
-    if(r.ok){
-      var data = await r.json();
-      if(data && data.suggestions && data.suggestions.length){
-        var proms = data.suggestions.slice(0,8).map(function(s){
-          var q = ((s.title||"") + " " + (s.artist||"")).trim();
-          return deezerSearch(q).then(function(dz){
-            var best = bestMatch(dz, s.artist);
-            return best ? slim(best) : { title:s.title||"", artist:s.artist||"", cover:"", link:"", preview:"" };
-          });
-        });
-        var enriched = await Promise.all(proms);
-        var seen = {}, out = [];
-        enriched.forEach(function(t){
-          if(!t || !t.title) return;
-          var k = (t.title+"|"+t.artist).toLowerCase();
-          if(seen[k]) return; seen[k]=1;
-          if((t.title||"").toLowerCase() === (chosen.title||"").toLowerCase()) return;
-          out.push(t);
-        });
-        if(out.length) return out;
-      }
-    }
+    if(r.ok){ var data = await r.json(); if(data && data.text) return data.text; }
   }catch(e){ console.error("ai:", e); }
-  return await getSuggestions(chosen); // repli Deezer
+  return "";
 }
 function addSuggestion(t){
   COL().add({
