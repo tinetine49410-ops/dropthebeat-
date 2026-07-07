@@ -1,5 +1,5 @@
-// Fonction Netlify — suggestions d'enchaînement DJ via ChatGPT (OpenAI, AI Gateway Netlify), texte riche.
-// Aucune clé à gérer : Netlify injecte OPENAI_API_KEY et OPENAI_BASE_URL automatiquement.
+=// Fonction Netlify — suggestions d'enchaînement DJ via ChatGPT (OpenAI, AI Gateway Netlify), texte riche.
+// Tente d'abord la recherche web (gpt-4o-search-preview), puis retombe sur gpt-4o si indisponible.
 export default async (req) => {
   const json = (obj, status = 200) =>
     new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
@@ -23,7 +23,8 @@ export default async (req) => {
 
   const prompt =
     `Tu es un DJ professionnel expérimenté qui anime des ${ambiance}. ` +
-    `Je viens de passer "${track}"${artist ? " de " + artist : ""} et je cherche quoi enchaîner (objectif : ${cap}).\n\n` +
+    `Je viens de passer "${track}"${artist ? " de " + artist : ""} et je cherche quoi enchaîner (objectif : ${cap}). ` +
+    `Si le morceau est récent ou peu connu, vérifie sur le web de quel morceau il s'agit avant de répondre.\n\n` +
     `Réponds de façon concise et pratique, en français, EXACTEMENT ainsi :\n` +
     `- Une courte phrase d'intro qui précise le style, l'époque et le tempo approximatif (BPM) du morceau.\n` +
     `- 2 ou 3 catégories courtes, chacune sur sa ligne au format "**Nom de catégorie**", suivie de 3 à 4 morceaux en puces "- Titre – Artiste original (remarque très courte facultative)".\n` +
@@ -34,31 +35,44 @@ export default async (req) => {
   const base = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
   const key = process.env.OPENAI_API_KEY || "";
 
-  try {
+  async function callModel(payload) {
     const r = await fetch(base + "/chat/completions", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "authorization": "Bearer " + key
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        temperature: 0.6,
-        max_tokens: 900,
-        messages: [{ role: "user", content: prompt }]
-      })
+      headers: { "content-type": "application/json", "authorization": "Bearer " + key },
+      body: JSON.stringify(payload)
     });
-
     const data = await r.json();
-    let text = "";
     if (data && data.choices && data.choices[0] && data.choices[0].message) {
-      text = String(data.choices[0].message.content || "").trim();
+      return String(data.choices[0].message.content || "").trim();
     }
-
-    return json({ text });
-  } catch (e) {
-    return json({ text: "", error: String(e) });
+    return "";
   }
+
+  let text = "";
+
+  // 1) Tentative AVEC recherche web (comportement ChatGPT).
+  try {
+    text = await callModel({
+      model: "gpt-4o-search-preview",
+      max_tokens: 900,
+      web_search_options: {},
+      messages: [{ role: "user", content: prompt }]
+    });
+  } catch (e) { text = ""; }
+
+  // 2) Repli SANS recherche web (fiable) si la première a échoué.
+  if (!text) {
+    try {
+      text = await callModel({
+        model: "gpt-4o",
+        max_tokens: 900,
+        temperature: 0.6,
+        messages: [{ role: "user", content: prompt }]
+      });
+    } catch (e) { text = ""; }
+  }
+
+  return json({ text });
 };
 
 export const config = { path: "/api/suggest" };
